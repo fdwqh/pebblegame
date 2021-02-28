@@ -167,7 +167,7 @@ bool graph::Free_Pebble(int u, vector<int> &p, vector<int> &a, vector<bool> &see
 {
 	a.push_back(u);
 	seen[u] = 1;
-	if (nodeArray[u].size() < 2)
+	if (nodeArray[u].size() < 2 || p[u] == FLOPPY)
 	{
 		p[u] = FLOPPY;
 		return 1;
@@ -175,7 +175,7 @@ bool graph::Free_Pebble(int u, vector<int> &p, vector<int> &a, vector<bool> &see
 	for (unordered_set<int>::iterator it = nodeArray[u].begin(); it != nodeArray[u].end(); it++)
 	{
 		int v = *it;
-		if (seen[v]) continue;
+		if (seen[v] || p[v] == RIGID) continue;
 		if (Free_Pebble(v, p, a, seen))
 		{
 			p[u] = FLOPPY;
