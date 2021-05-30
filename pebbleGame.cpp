@@ -36,12 +36,14 @@ public:
 	vector<edge> edgeArray;
 	vector<vector<int>> adjacencyList;
 	unordered_map<pii, int, pair_hash> edgeMap;
+	unordered_map<int, unordered_set<int>> VertexForCluster; //Vertexs for every rigid cluster
 	void input();
 	void output();
 	int runPebbleGame();
 	bool Enlarge_Cover(int edgeID, int k);
 	bool Find_Pebble(int startPoint, vector<bool> &seen);
 	void Find_rigidCluster();
+	void Find_redundantRigid();
 private:
 	void coverEdge(int edgeID, int coverNode);
 	void Gather_Pebble(int edgeID);
@@ -87,6 +89,14 @@ void graph::output()
 	Find_rigidCluster();
 	for (int i = 0; i < m; i++)
 		cout << 'e' << i << ": " << edgeArray[i].pebbleState << ' ' << edgeArray[i].label << endl;
+	Find_redundantRigid();
+	for (unordered_map<int, unordered_set<int>>::iterator it = VertexForCluster.begin(); 
+		it != VertexForCluster.end(); it++)
+	{
+		for (unordered_set<int>::iterator iter = (*it).second.begin(); iter != (*it).second.end(); iter++)
+			cout << (*iter) << ' ';
+		cout << endl;
+	}
 }
 int graph::runPebbleGame()
 {
@@ -115,10 +125,10 @@ bool graph::Enlarge_Cover(int e, int k)
 		if(*it != a) bNeighbor.push_back(*it);
 	for (int i = 0; i < aNeighbor.size(); i++)
 	{
-		vector<bool> seen(n);
-		seen[a] = seen[b] = 1;
+		vector<bool> seen1(n);
+		seen1[a] = seen1[b] = 1;
 		int x = aNeighbor[i];
-		bool found = Find_Pebble(x, seen);
+		bool found = Find_Pebble(x, seen1);
 		if (found)
 		{
 			coverEdge(edgeMap[mp(a, x)], x);
@@ -129,10 +139,10 @@ bool graph::Enlarge_Cover(int e, int k)
 	}
 	for (int i = 0; i < bNeighbor.size(); i++)
 	{
-		vector<bool> seen(n);
-		seen[a] = seen[b] = 1;
+		vector<bool> seen2(n);
+		seen2[a] = seen2[b] = 1;
 		int x = bNeighbor[i];
-		bool found = Find_Pebble(x, seen);
+		bool found = Find_Pebble(x, seen2);
 		if (found)
 		{
 			coverEdge(edgeMap[mp(b, x)], x);
@@ -194,7 +204,7 @@ void graph::Find_rigidCluster()
 		int u = edgeArray[i].u;
 		int v = edgeArray[i].v;
 		Enlarge_Cover(i, 3);
-		cout << i << ":";  for (int j = 0; j < m; j++) cout << edgeArray[j].pebbleState << ' '; cout << endl;
+		//cout << i << ":";  for (int j = 0; j < m; j++) cout << edgeArray[j].pebbleState << ' '; cout << endl;
 		vector<int> isRigidSite(n); //whether vertex(i) is a rigid site
 		queue<int> q;
 		q.push(u);
@@ -230,6 +240,35 @@ void graph::Find_rigidCluster()
 		}
 		rigidLabel++;
 	} 
+}
+void graph::Find_redundantRigid()
+{
+	unordered_map<int, int> edgeCountForCluster;
+	for (int i = 0; i < edgeArray.size(); i++)
+	{
+		int label = edgeArray[i].label;
+		int a = edgeArray[i].u;
+		int b = edgeArray[i].v;
+		if (edgeCountForCluster.find(label) == edgeCountForCluster.end())
+		{
+			edgeCountForCluster[label] = 1;
+			VertexForCluster[label] = { a,b };
+		}
+		else
+		{
+			edgeCountForCluster[label]++;
+			VertexForCluster[label].insert(a);
+			VertexForCluster[label].insert(b);
+		}
+	}
+	for (unordered_map<int, int>::iterator it = edgeCountForCluster.begin(); it != edgeCountForCluster.end(); it++)
+	{
+		int label = (*it).first;
+		int edgeCount = (*it).second;
+		int vertexCount = VertexForCluster[label].size();
+		if (edgeCount == 2 * vertexCount - 3) // e > 2n - 3 redundant rigid 
+			VertexForCluster.erase(label);
+	}
 }
 int main()
 {
