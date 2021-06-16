@@ -7,7 +7,7 @@
 #define mp make_pair
 #define pii pair<int, int>
 using namespace std;
-const int maxn = 1e5+10;
+const int maxn = 1e5 + 10;
 const int RIGID = 1;
 const int FLOPPY = -1;
 struct pair_hash
@@ -24,18 +24,21 @@ struct edge
 {
 	int pebbleState;
 	int label;
+	int ocLabel;
 	int u, v; //Two ends of the edge
-	edge(int s, int t) :pebbleState(-1), label(-1), u(s), v(t)  {}
+	edge(int s, int t) :pebbleState(-1), label(-1), ocLabel(-1), u(s), v(t) {}
 };
 class graph
 {
 public:
 	int n;
 	int m;
-	vector<unordered_set<int>> nodeArray; 
+	vector<unordered_set<int>> nodeArray;
 	vector<edge> edgeArray;
 	vector<vector<int>> adjacencyList;
 	unordered_map<pii, int, pair_hash> edgeMap;
+	int ocRegionNumber;
+	vector<int> sizeOfOcRegion;
 	unordered_map<int, unordered_set<int>> VertexForCluster; //Vertexs for every rigid cluster
 	void input();
 	void output();
@@ -46,24 +49,23 @@ public:
 	void Find_redundantRigid();
 private:
 	void coverEdge(int edgeID, int coverNode);
-	void Gather_Pebble(int edgeID);
-	bool Free_Pebble(int pointID,vector<int> &isRigidSite, vector<int> &nodeinSearch, vector<bool> &seen);
+	bool Free_Pebble(int pointID, vector<int> &isRigidSite, vector<int> &nodeinSearch, vector<bool> &seen);
 };
 void graph::coverEdge(int e, int u)
 {
 	//The other vertex of this edge
-	int v = edgeArray[e].u == u ? edgeArray[e].v : edgeArray[e].u; 
+	int v = edgeArray[e].u == u ? edgeArray[e].v : edgeArray[e].u;
 	if (edgeArray[e].pebbleState == -1) //If the edge has not been covered
 		//cover
 		nodeArray[u].insert(v);
-	else if(edgeArray[e].pebbleState == v) //If the edge has already been covered by u
+	else if (edgeArray[e].pebbleState == v) //If the edge has already been covered by u
 	{
 		//release & cover
 		nodeArray[v].erase(u);
 		nodeArray[u].insert(v);
 	}
 	/*
-	Otherwise, the edge has already been covered by the 
+	Otherwise, the edge has already been covered by the
 	pebble from vertex u, nothing should to be done.
 	*/
 	edgeArray[e].pebbleState = u;
@@ -73,6 +75,7 @@ void graph::input()
 	cin >> n >> m;
 	nodeArray.resize(n);
 	adjacencyList.resize(n);
+	sizeOfOcRegion.resize(n);
 	for (int i = 0; i < m; i++)
 	{
 		int u, v;
@@ -80,7 +83,7 @@ void graph::input()
 		adjacencyList[u].push_back(v);
 		adjacencyList[v].push_back(u);
 		edgeArray.push_back(edge(u, v));
-		edgeMap[mp(u, v)] = i, edgeMap[mp(v, u)] = i; 
+		edgeMap[mp(u, v)] = i, edgeMap[mp(v, u)] = i;
 	}
 }
 void graph::output()
@@ -88,15 +91,16 @@ void graph::output()
 	bool isRigid = runPebbleGame();
 	Find_rigidCluster();
 	for (int i = 0; i < m; i++)
-		cout << 'e' << i << ": " << edgeArray[i].pebbleState << ' ' << edgeArray[i].label << endl;
-	Find_redundantRigid();
-	for (unordered_map<int, unordered_set<int>>::iterator it = VertexForCluster.begin(); 
+		cout << 'e' << i << ": " << edgeArray[i].pebbleState << ' ' 
+		<< edgeArray[i].label << ' ' << edgeArray[i].ocLabel << endl;
+	/*Find_redundantRigid();
+	for (unordered_map<int, unordered_set<int>>::iterator it = VertexForCluster.begin();
 		it != VertexForCluster.end(); it++)
 	{
 		for (unordered_set<int>::iterator iter = (*it).second.begin(); iter != (*it).second.end(); iter++)
 			cout << (*iter) << ' ';
 		cout << endl;
-	}
+	}*/
 }
 int graph::runPebbleGame()
 {
@@ -120,9 +124,10 @@ bool graph::Enlarge_Cover(int e, int k)
 	vector<int> aNeighbor;
 	vector<int> bNeighbor;
 	for (unordered_set<int>::iterator it = nodeArray[a].begin(); it != nodeArray[a].end(); it++)
-		if(*it != b) aNeighbor.push_back(*it);
+		if (*it != b) aNeighbor.push_back(*it);
 	for (unordered_set<int>::iterator it = nodeArray[b].begin(); it != nodeArray[b].end(); it++)
-		if(*it != a) bNeighbor.push_back(*it);
+		if (*it != a) bNeighbor.push_back(*it);
+	vector<int> seen(n);
 	for (int i = 0; i < aNeighbor.size(); i++)
 	{
 		vector<bool> seen1(n);
@@ -135,6 +140,11 @@ bool graph::Enlarge_Cover(int e, int k)
 			pebbleCount++;
 			if (pebbleCount >= k)
 				return 1;
+		}
+		else if(k == 4)
+		{
+			for (int j = 0; j < n; j++)
+				if (seen1[j]) seen[j] = 1;
 		}
 	}
 	for (int i = 0; i < bNeighbor.size(); i++)
@@ -150,6 +160,23 @@ bool graph::Enlarge_Cover(int e, int k)
 			if (pebbleCount >= k)
 				return 1;
 		}
+		else if(k == 4)
+		{
+			for (int j = 0; j < n; j++)
+				if (seen2[j]) seen[j] = 1;
+		}
+	}
+	if (k == 4)
+	{
+		ocRegionNumber++;
+		int edgeNumber = 0;
+		for (int i = 0; i < m; i++)
+			if (seen[edgeArray[i].u] && seen[edgeArray[i].v]) edgeNumber++;
+		for (int i = 0; i < m; i++)
+			if (seen[edgeArray[i].u] && seen[edgeArray[i].v]
+				&& (edgeArray[i].ocLabel == -1 || edgeNumber > sizeOfOcRegion[edgeArray[i].ocLabel]))
+				edgeArray[i].ocLabel = ocRegionNumber;
+		sizeOfOcRegion[ocRegionNumber] = edgeNumber;
 	}
 	return 0;
 }
@@ -239,7 +266,7 @@ void graph::Find_rigidCluster()
 				edgeArray[i].label = rigidLabel;
 		}
 		rigidLabel++;
-	} 
+	}
 }
 void graph::Find_redundantRigid()
 {
